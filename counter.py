@@ -27,7 +27,7 @@ class Body_point:
         self.body_part = points_name[point]
         self.save_path = '..\\data\\image\\'+self.file_name+'\\'+self.body_part+'\\'
         manage_folder.Check_folder(self.save_path)
-
+        self.average_wavelength = 0
 
     def get_amplitude(self):
         
@@ -36,36 +36,67 @@ class Body_point:
         self.minimum = []
         self.amplitude = []
         self.wavelength = []
+        self.dobule_amplitude = []
         
-        # 找出所有區間極值
+        # 找出所有區間極值，並過濾偽區間極值
         max_tmp = []
         min_tmp = []
         for i in range(1,self.frame_num-1):
             if self.data[i-1] < self.data[i] and self.data[i+1]< self.data[i]:
-                max_tmp.append(i)
+                
+                left = i - int(( self.average_wavelength / 2 ) )
+                right = i + int(( self.average_wavelength / 2 ) )
+                
+                if 0 > left :
+                    left = 0
+                if right > self.frame_num :
+                    right = self.frame_num   
+                if self.average_wavelength == 0 :
+                    right =  i+1
+                
+                if self.data[i] == np.max(self.data[left:right]):
+                    max_tmp.append(i)
+                    
             elif self.data[i-1]>self.data[i] and self.data[i+1]>self.data[i]:
-                min_tmp.append(i)
-
+                
+                left = i - int(( self.average_wavelength * 0.3) )
+                right = i + int(( self.average_wavelength *0.3 ) )
+                
+                if 0 > left :
+                    left = 0
+                if right > self.frame_num :
+                    right = self.frame_num   
+                if self.average_wavelength == 0 :
+                    right =  i+1    
+                
+                if self.data[i] == np.min(self.data[left:right]) :
+                    min_tmp.append(i)
+                
+        #print(len(min_tmp))
         # 找出所有的波、振幅、波長  
         i = 0
         j = 0
+        k = 1
         minsize = len(min_tmp)
         maxsize = len(max_tmp)
-        while i != minsize and j+1 != maxsize:
-            if max_tmp[j] < min_tmp[i] < max_tmp[j+1]:
+        while i != minsize and j+k != maxsize:
+            if  max_tmp[j] < min_tmp[i] < max_tmp[j+k] :           
                 self.minimum.append(min_tmp[i])
                 self.L_maximum.append(max_tmp[j])
-                self.R_maximum.append(max_tmp[j+1])
+                self.R_maximum.append(max_tmp[j+k])
                 self.amplitude.append(np.min( [self.data[max_tmp[j]]-self.data[min_tmp[i]],
-                                              self.data[max_tmp[j+1]]-self.data[min_tmp[i]] ]))
-                self.wavelength.append(max_tmp[j+1]-max_tmp[j]+1)
+                                            self.data[max_tmp[j+k]]-self.data[min_tmp[i]] ]))
+                self.dobule_amplitude.append(self.data[max_tmp[j]]-self.data[min_tmp[i]]+
+                                self.data[max_tmp[j+k]]-self.data[min_tmp[i]] )
+                self.wavelength.append(max_tmp[j+k]-max_tmp[j]+1)
                 i += 1
-                j += 1          
+                j += k                      
             elif max_tmp[j] > min_tmp[i]:
                 i += 1
-            else :
+            else:
                 j += 1     
-        
+
+        #print(len(self.amplitude))
         # 正規化振幅，並分段
         self.normalization_amplitude = self.amplitude/np.linalg.norm(self.amplitude)
         self.section_normalization_amplitude = []
@@ -81,7 +112,7 @@ class Body_point:
                 tmp2.append(num)
             else:
                 self.section_normalization_amplitude.append(0)
-        
+       
         #　取振幅眾數
         self.mode_amplitude = statistics.mode(tmp2)
 
@@ -99,6 +130,7 @@ class Body_point:
         self.amplitude_upper_bound = self.average_amplitude + self.std_amplitude * self.var
         self.amplitude_lower_bound = self.average_amplitude - self.std_amplitude * self.var
         
+        
        
     def get_wavelength(self):
 
@@ -107,47 +139,37 @@ class Body_point:
         for idx in range(len(self.section_normalization_amplitude)):
             if self.section_normalization_amplitude[idx] == self.mode_amplitude:
                 tmp.append(self.wavelength[idx])      
-        self.average_wavelength = np.mean(tmp)
+        self.average_wavelength = int( np.mean(tmp) + 0.5 )
         
         # 取波長區間
-        self.wavelength_upper_bound = self.average_wavelength  * 1.3
-        self.wavelength_lower_bound = self.average_wavelength  * 0.7        
-
+        self.wavelength_upper_bound = int(self.average_wavelength  * 1.5 + 0.5 )
+        self.wavelength_lower_bound = int(self.average_wavelength  * 0.5 + 0.5 ) 
+        #print(self.wavelength_upper_bound,self.wavelength_lower_bound,int(self.average_wavelength))
 
     def jump_rope_count(self):
 
         times = 0
         self.flag = []
-        '''
         for i in range(len(self.minimum)):
-            if self.amplitude_lower_bound < self.amplitude[i] < self.amplitude_upper_bound:
-                if self.wavelength_lower_bound < self.wavelength[i] <self.wavelength_upper_bound:
+            if self.dobule_amplitude[i] >= self.average_amplitude * 0.7 :
+                if self.wavelength_lower_bound <= self.wavelength[i] <= self.wavelength_upper_bound:
                     self.flag.append(2)
                     times += 1
                 else:
                     self.flag.append(1)
             else :
                 self.flag.append(0)
-        '''
-
-        for i in range(len(self.minimum)):
-            if 0.001 < self.amplitude[i]:
-                if self.wavelength_lower_bound < self.wavelength[i] <self.wavelength_upper_bound:
-                    self.flag.append(2)
-                    times += 1
-                else:
-                    self.flag.append(1)
-            else :
-                self.flag.append(0)
-
-        #print(self.amplitude_lower_bound, self.average_amplitude, self.amplitude_upper_bound)
-        #print(self.wavelength_lower_bound, self.average_wavelength , self.wavelength_upper_bound)
        
         df = pd.DataFrame({'maxL':self.L_maximum,'min':self.minimum,'maxR':self.R_maximum,
                            'amplitude':self.amplitude,'wavelength':self.wavelength,'flag':self.flag})
         
         df.to_csv(self.save_path+'flag.csv',index=False)
 
+        info = ['amplitude','wavelength']
+        num = [self.average_amplitude,self.average_wavelength]
+        df =  pd.DataFrame([info,num])
+        df.to_csv(self.save_path+'info.csv',index=False)
+        
         return times
                 
 
@@ -434,6 +456,7 @@ class Body_point:
         )
 
         line.render(self.save_path+self.body_part+'.html')
+        line.render('..\\data\\shoulder_waveform\\'+self.file_name+'.html')
     
 
 def count_score(mycount):
@@ -458,8 +481,10 @@ if __name__=="__main__":
     files = os.listdir('..\\data\\pose_landmarks\\')
     for file in files:
         a = Body_point(file,11)
-        a.get_amplitude()
-        a.get_wavelength()
+        for i in range(2):
+            a.get_amplitude()
+            a.get_wavelength()
+
         ans = a.jump_rope_count()  
         times.append(ans)  
         
@@ -475,16 +500,18 @@ if __name__=="__main__":
 
     '''
     
-    a = Body_point('A1102.csv',11)
-    a.get_amplitude()
-    a.get_wavelength()
+    a = Body_point('A1103.csv',11)
+    for i in range(2):
+        a.get_amplitude()
+        a.get_wavelength()
     ans = a.jump_rope_count()  
+    
     #a.amplitude_waveform()
     #a.normalize_amplitude_waveform()
     #a.average_amplitude_waveform()
     #a.section_normalize_amplitude_waveform()
-    #a.body_parts_waveform()
-    print('times = {}'.format(ans))
+    a.body_parts_waveform()
+    #print('times = {}'.format(ans))
     
     #'''
     
