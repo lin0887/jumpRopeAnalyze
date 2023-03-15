@@ -122,7 +122,7 @@ class Body_point:
             if self.section_normalization_amplitude[i] == self.mode_amplitude:
                 tmp.append(self.amplitude[i])
         self.average_amplitude = np.mean(tmp)
-
+        
         # 取振幅標準差
         self.std_amplitude = np.std(tmp, ddof=1)
         
@@ -463,15 +463,16 @@ def count_score(mycount):
 
     df = pd.read_csv('..\\data\\all.csv')
     a = []
+    error = 0
     for i in range(df.shape[0]):
-        if df['score'][i] == 'X':
-            a.append(mycount[i])
-        else:
-            a.append(mycount[i]-int(df['score'][i]))
+        a.append(mycount[i]-int(df['score'][i]))
+        if abs(mycount[i]-int(df['score'][i])) > 1 :
+            error += 1
     df['count'] = mycount    
     df['dif'] = a
     
     df.to_csv('..\\data\\'+'my_count.csv',index = False)
+    print('error {}/997 = {}'.format(error,error/997))
 
 
 if __name__=="__main__":
@@ -492,7 +493,7 @@ if __name__=="__main__":
         #a.normalize_amplitude_waveform()
         #a.section_normalize_amplitude_waveform()
         #a.average_amplitude_waveform()
-        a.body_parts_waveform()
+        #a.body_parts_waveform()
         
         print(file)
 
