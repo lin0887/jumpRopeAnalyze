@@ -6,10 +6,11 @@ from pyecharts.charts import Line,Bar
 import numpy as np
 import manage_folder
 import statistics
+import logging
 
 class Body_point:
 
-    def __init__(self,file,point):
+    def __init__(self,file,point,root_path):
 
         points_name = ['nose','left_eye_ionner','left_eye','left_eye_outer','right_eye_inner','right_eye','right_eye_outer',
         'left_ear','right_ear','left_month','right_month','left_shoulder','right_shoulder','left_elbow','right_elbow',
@@ -17,16 +18,18 @@ class Body_point:
         'left_hip','right_hip','left_knee','right_knee','left_ankle','right_ankle','left_heel','right_heel',
         'left_foot_index','right_foot_index','center',
         ]
-
-        pose_data = pd.read_csv('..\\data\\pose_landmarks\\'+file)
+        
+        pose_data = pd.read_csv(root_path+'\\pose_landmarks\\'+file)
         self.data = pose_data[str(point+33)]
         self.frame_num = len(self.data)
         self.frame = range(self.frame_num)
         self.file_name = file.split('.')[0]
         self.var = 2.5
         self.body_part = points_name[point]
-        self.save_path = '..\\data\\image\\'+self.file_name+'\\'+self.body_part+'\\'
+        self.save_path = root_path+'\\image\\'+self.file_name+'\\'
+        self.shoulder_path = root_path+'\\shoulder\\'
         manage_folder.Check_folder(self.save_path)
+        manage_folder.Check_folder(self.shoulder_path)
         self.average_wavelength = 0
 
     def get_amplitude(self):
@@ -456,63 +459,86 @@ class Body_point:
         )
 
         line.render(self.save_path+self.body_part+'.html')
-        line.render('..\\data\\shoulder_waveform\\'+self.file_name+'.html')
+        line.render(self.shoulder_path+self.file_name+'.html')
     
 
 def count_score(mycount):
 
     df = pd.read_csv('..\\data\\all.csv')
     a = []
+    miss_rate = []
     error = 0
     for i in range(df.shape[0]):
-        a.append(mycount[i]-int(df['score'][i]))
-        if abs(mycount[i]-int(df['score'][i])) > 1 :
+        num = mycount[i]-int(df['score'][i])
+        a.append(num)
+        if df['score'][i] != 0:
+            miss_rate.append(abs(num)/int(df['score'][i]))
+        else:
+            miss_rate.append(abs(num))
+        if abs(num) > 5 :
             error += 1
+
     df['count'] = mycount    
     df['dif'] = a
-    
+    df['miss'] = miss_rate
     df.to_csv('..\\data\\'+'my_count.csv',index = False)
     print('error {}/997 = {}'.format(error,error/997))
+    print('miss {}'.format(np.mean(miss_rate)))
 
 
 if __name__=="__main__":
 
     #'''
-    times = []
-    files = os.listdir('..\\data\\pose_landmarks\\')
+    data_path = '..\\2023_data'
+    score = []
+    student_id = []
+    files = os.listdir(data_path+'\\pose_landmarks\\')
+    logging.basicConfig(filename = data_path+'\\counterError.log', level=logging.ERROR)
     for file in files:
-        a = Body_point(file,11)
-        for i in range(2):
-            a.get_amplitude()
-            a.get_wavelength()
-
-        ans = a.jump_rope_count()  
-        times.append(ans)  
         
-        #a.amplitude_waveform()
-        #a.normalize_amplitude_waveform()
-        #a.section_normalize_amplitude_waveform()
-        #a.average_amplitude_waveform()
-        #a.body_parts_waveform()
-        
-        print(file)
+        try:
+            a = Body_point(file,11,data_path)
+            for i in range(2):
+                a.get_amplitude()
+                a.get_wavelength()
 
-    count_score(times)
+            ans = a.jump_rope_count()  
+            score.append(ans) 
+            
+            student_id.append(file.split('.')[0])
+            print(file)
+            '''
+            a.amplitude_waveform()
+            a.normalize_amplitude_waveform()
+            a.section_normalize_amplitude_waveform()
+            a.average_amplitude_waveform()
+            a.body_parts_waveform()
+            '''
+        
+            
+
+        except:
+            logging.error(str(file)+' have error ')
+    
+    df = pd.DataFrame({'id':student_id,'score':score})
+    df.to_csv(data_path+'\\my_count.csv',index=False)
+    #count_score(times)
 
     '''
-    
-    a = Body_point('A1103.csv',11)
+    data_path = '..\\2023_data'
+    a = Body_point('11001.csv',11,data_path)
     for i in range(2):
         a.get_amplitude()
         a.get_wavelength()
     ans = a.jump_rope_count()  
     
-    #a.amplitude_waveform()
-    #a.normalize_amplitude_waveform()
-    #a.average_amplitude_waveform()
-    #a.section_normalize_amplitude_waveform()
+    a.amplitude_waveform()
+    a.normalize_amplitude_waveform()
+    a.average_amplitude_waveform()
+    a.section_normalize_amplitude_waveform()
     a.body_parts_waveform()
-    #print('times = {}'.format(ans))
+    
+    print('times = {}'.format(ans))
     
     #'''
     
